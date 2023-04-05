@@ -3,7 +3,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 
 using AJFeedReader.Models;
 
@@ -12,78 +11,56 @@ namespace AJFeedReader
 
     public class FeedReader
     {
-        private List<FeedItem> items;
 
-        public FeedReader()
+
+        private string Download(IFeedSource source)
         {
-            Clear();
-        }
-
-        public void Clear()
-        {
-            items = new List<FeedItem>();
-        }
-
-        private void ProccessContent(string Content, string SiteLink)
-        {
-            var xd = XDocument.Parse(Content);
-
-            var items = from i in xd.Descendants("item")
-                        select new FeedItem(i, SiteLink);
-
-            foreach (var i in items)
-                this.items.Add(i);
-        }
-
-        private void Download(string source)
-        {
-            var wr = WebRequest.Create(source);
+            var wr = WebRequest.Create(source.SourceLink);
             var stream = wr.GetResponse().GetResponseStream();
             var sr = new StreamReader(stream);
-            ProccessContent(sr.ReadToEnd(), source);
+            return sr.ReadToEnd();
         }
 
-        public IEnumerable<FeedItem> GetFeeds(IEnumerable<string> sources)
+        private async Task<string> DownloadAsync(IFeedSource source)
         {
+            var wr = WebRequest.Create(source.SourceLink);
+            var stream = (await wr.GetResponseAsync()).GetResponseStream();
+            var sr = new StreamReader(stream);
+            return await sr.ReadToEndAsync();
+        }
+
+
+        public IEnumerable<FeedItem> GetFeeds(IEnumerable<IFeedSource> sources)
+        {
+            List<FeedItem> items = new List<FeedItem>();
             if (sources.Any())
             {
                 foreach (var s in sources)
                     try
                     {
-                        Download(s);
+                        var content = Download(s);
+                        items.AddRange(FeedParser.Parse(content, s));
                     }
                     catch { }
 
                 return items.OrderByDescending(i => i.PubDate);
             }
 
-            return null;
+            return items;
         }
 
-        private async Task ProccessContentAsync(string Content, string SiteLink)
-        {
-            await Task.Run(() =>
-            {
-                ProccessContent(Content, SiteLink);
-            });
-        }
 
-        private async Task DownloadAsync(string source)
+        public async Task<IEnumerable<FeedItem>> GetFeedsAsync(IEnumerable<IFeedSource> sources)
         {
-            var wr = WebRequest.Create(source);
-            var stream = (await wr.GetResponseAsync()).GetResponseStream();
-            var sr = new StreamReader(stream);
-            await ProccessContentAsync(await sr.ReadToEndAsync(), source);
-        }
+            var items = new List<FeedItem>();
 
-        public async Task<IEnumerable<FeedItem>> GetFeedsAsync(IEnumerable<string> sources)
-        {
             if (sources.Any())
             {
                 foreach (var s in sources)
                     try
                     {
-                        await DownloadAsync(s);
+                        var tmp = await DownloadAsync(s);
+                        items.AddRange(FeedParser.Parse(tmp, s));
                     }
                     catch { }
 
@@ -92,5 +69,6 @@ namespace AJFeedReader
 
             return null;
         }
+
     }
 }

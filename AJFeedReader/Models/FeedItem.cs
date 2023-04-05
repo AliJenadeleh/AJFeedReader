@@ -28,7 +28,7 @@ namespace AJFeedReader.Models
         //----------------------------------------------
 
         public FeedItem() { }
-        public FeedItem(XElement xelement, string SiteLink = "")
+        public FeedItem(XElement xelement, IFeedSource source)
         {
             try
             {
@@ -37,7 +37,8 @@ namespace AJFeedReader.Models
             catch { }
 
             this.Category = xelement.Element(Tags.Category)?.Value;
-            this.SiteLink = SiteLink;
+            this.SiteLink = source.SiteUrl;
+            this.SiteName = source.SiteName;
             this.Title = xelement.Element(Tags.Title)?.Value;
             this.Link = xelement.Element(Tags.Link)?.Value;
             this.Description = xelement.Element(Tags.Description)?.Value.HtmlDecode();
